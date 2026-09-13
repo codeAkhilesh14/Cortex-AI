@@ -28,7 +28,7 @@ app.use("/api/billing", protect, proxyWithHeader(process.env.BILLING_SERVICE));
 app.get("/api/me", protect, getCurrentUser);
 
 app.get("/", (req, res) => {
-  res.status(200).json({ status: "Gateway service is healthy" });
+  res.status(200).json({ status: "Gateway service is healthy v1" });
 });
 
 app.listen(PORT, () => {

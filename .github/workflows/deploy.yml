@@ -197,7 +197,7 @@ jobs:
           s3://${{secrets.s3_BUCKET}} \
           --delete
 
-      -  name: invalidate cloudfront
+      - name: invalidate cloudfront
         run: |
           aws cloudfront create-invalidation \
           --distribution-id \

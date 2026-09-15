@@ -31,6 +31,10 @@ app.get("/", (req, res) => {
   res.status(200).json({ status: "Gateway service is healthy v1" });
 });
 
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "Gateway service is healthy v1" });
+});
+
 app.listen(PORT, () => {
   console.log(`Gateway service is running on port ${PORT}`);
 });

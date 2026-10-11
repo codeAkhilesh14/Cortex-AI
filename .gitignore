@@ -71,7 +71,9 @@ firebase-adminsdk*.json
 # ==============================
 # Docker
 # ==============================
-.dockerignore
+# .dockerignore files are intentionally tracked - they exclude secrets
+# (.env, serviceAccountKey.json) from the Docker build context and must
+# be present when CI builds the images.
 
 
 # ------------------------------

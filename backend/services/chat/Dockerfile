@@ -1,17 +1,19 @@
-FROM node
+FROM node:20-alpine
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm install --omit=dev
 
 COPY ./services/chat/package*.json ./services/chat/
-RUN cd services/chat && npm install
+RUN cd services/chat && npm install --omit=dev
 
-COPY services/chat ./services/chat
-COPY shared ./shared
+COPY --chown=node:node services/chat ./services/chat
+COPY --chown=node:node shared ./shared
 
 WORKDIR /app/services/chat
+
+USER node
 
 EXPOSE 8002
 

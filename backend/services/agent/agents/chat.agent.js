@@ -11,7 +11,7 @@ export const chatAgent = async (state) => {
 
         const llm = await getModel("chat")
 
-        const history = await getMemory(state.conversationId)
+        const history = await getMemory(state.conversationId, state.userId)
         
         const searchContext = state.searchResults ? 
         `

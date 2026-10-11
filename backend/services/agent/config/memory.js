@@ -1,13 +1,13 @@
 import redis from "../../../shared/redis/redis.js"
 import { getMessages } from "../utils/getMessages.js"
 
-export const getMemory = async (conversationId) => {
+export const getMemory = async (conversationId, userId) => {
     const key = `messages-${conversationId}`
     const cached = await redis.get(key)
     if(cached) {
         return JSON.parse(cached).filter(msg => typeof msg.content === "string" && msg.content.trim())
     }
-    const messages = await getMessages(conversationId) || []
+    const messages = await getMessages(conversationId, userId) || []
     const validMessages = messages.filter(msg => typeof msg.content === "string" && msg.content.trim())
     await redis.set(key, JSON.stringify(validMessages), "EX", 24*60*60) // for 1 day stored in Redis
     return validMessages

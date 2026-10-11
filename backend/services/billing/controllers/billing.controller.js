@@ -3,6 +3,13 @@ import razorpay from "../config/razorpay.js"
 import Payment from "../models/payment.model.js"
 import crypto from "crypto"
 import axios from "axios"
+import { checkRateLimit } from "../../../shared/rateLimit/rateLimit.js"
+import { signInternalRequest } from "../../../shared/internalAuth/internalAuth.js"
+
+export const verifyRazorpaySignature = (orderId, paymentId, signature, secret) => {
+    const expected = crypto.createHmac("sha256", secret).update(`${orderId}|${paymentId}`).digest("hex")
+    return expected === signature
+}
 
 export const createOrder = async (req, res) => {
     try {
@@ -41,29 +48,57 @@ export const createOrder = async (req, res) => {
 
 export const verifyPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body
-        
-        const generateSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(`${razorpay_order_id}|${razorpay_payment_id}`).digest("hex")
+        const userId = req.headers["x-user-id"]
+        const { allowed, retryAfter } = await checkRateLimit(`rate:verify-payment:${userId}`, 20, 60)
+        if (!allowed) {
+            return res.status(429).json({ message: `Too many verification attempts. Try again in ${retryAfter}s.` })
+        }
 
-        if(generateSignature != razorpay_signature) {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body
+
+        if(!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, process.env.RAZORPAY_KEY_SECRET)) {
             return res.status(404).json({ message: "Payment Verification Failed" })
         }
 
-        const payment = await Payment.findOne({ orderId: razorpay_order_id })
+        const existingPayment = await Payment.findOne({ orderId: razorpay_order_id })
 
-        if(!payment) {
+        if(!existingPayment) {
             return res.status(404).json({ message: "Payment Not Found" })
         }
 
-        payment.status = "paid"
-        payment.paymentId = razorpay_payment_id
+        if(existingPayment.userId !== userId) {
+            return res.status(403).json({ message: "Payment does not belong to this user" })
+        }
 
-        await payment.save()
+        if(existingPayment.status === "paid") {
+            return res.status(200).json({ message: "Payment Verified Successfully" })
+        }
 
-        await axios.post(`${process.env.AUTH_SERVICE}/update-plan`, {
+        // Atomic created -> paid transition so a replayed/concurrent verification
+        // can never grant credits more than once for the same order.
+        const payment = await Payment.findOneAndUpdate(
+            { orderId: razorpay_order_id, status: "created" },
+            { status: "paid", paymentId: razorpay_payment_id },
+            { new: true }
+        )
+
+        if(!payment) {
+            // Someone else already completed the transition between our reads.
+            return res.status(200).json({ message: "Payment Verified Successfully" })
+        }
+
+        const updatePlanPayload = {
             userId: payment.userId,
             plan: payment.plan,
             credits: payment.credits,
+        }
+        const { timestamp, signature } = signInternalRequest(process.env.INTERNAL_SERVICE_SECRET, updatePlanPayload)
+
+        await axios.post(`${process.env.AUTH_SERVICE}/update-plan`, updatePlanPayload, {
+            headers: {
+                "x-internal-timestamp": timestamp,
+                "x-internal-signature": signature
+            }
         })
         return res.status(200).json({ message: "Payment Verified Successfully" })
     } catch (error) {

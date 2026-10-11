@@ -10,7 +10,7 @@ export const createConversation = async (req, res) => {
         console.log(error);
         res.status(500).json({ error: "Internal server error while creating conversation" });
     }
-}    
+}
 
 export const getConversations = async (req, res) => {
     try {
@@ -25,24 +25,33 @@ export const getConversations = async (req, res) => {
 
 export const updateConversation = async (req, res) => {
     try {
+        const userId = req.headers['x-user-id']
         const { id, title } = req.body
         if (!id || !title) {
             return res.status(400).json({ error: "id and title are required" });
         }
-        const conversation = await Conversation.findByIdAndUpdate(id, { title })
+        const conversation = await Conversation.findOneAndUpdate({ _id: id, userId }, { title }, { new: true })
+        if (!conversation) {
+            return res.status(404).json({ error: "Conversation not found" });
+        }
         return res.status(200).json(conversation);
     } catch (error) {
         console.log(error);
         res.status(500).json({ error: "Internal server error while updating conversation" });
     }
-} 
+}
 
 export const saveMessage = async (req, res) => {
     try {
+        const userId = req.headers['x-user-id']
         const { conversationId, role, content, images, artifacts } = req.body;
         // if (!conversationId || !role || !content) {
         //     return res.status(400).json({ error: "conversationId, role, and content are required" });
         // }
+        const conversation = await Conversation.findOne({ _id: conversationId, userId })
+        if (!conversation) {
+            return res.status(404).json({ error: "Conversation not found" });
+        }
         const message = await Message.create({ conversationId, role, content, images, artifacts });
         return res.status(200).json(message);
     } catch (error) {
@@ -53,6 +62,11 @@ export const saveMessage = async (req, res) => {
 
 export const getMessages = async (req, res) => {
     try {
+        const userId = req.headers['x-user-id']
+        const conversation = await Conversation.findOne({ _id: req.params.conversationId, userId })
+        if (!conversation) {
+            return res.status(404).json({ error: "Conversation not found" });
+        }
         const messages = await Message.find({ conversationId: req.params.conversationId });
         return res.status(200).json(messages);
     } catch (error) {

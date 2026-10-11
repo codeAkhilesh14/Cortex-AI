@@ -11,7 +11,34 @@ env:
 
 jobs:
 
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [gateway, services/auth, services/chat, services/billing, services/agent]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Install service dependencies
+        working-directory: backend/${{ matrix.service }}
+        run: npm install
+
+      - name: Run tests
+        working-directory: backend/${{ matrix.service }}
+        run: npm test
+
   deploy-backend:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -10,7 +10,13 @@ const Limits = {
 }
 
 export const checkAgentLimit = async (userId, agent) => {
-    const max = Limits[agent] || Limits[chat]
+    if (!Object.prototype.hasOwnProperty.call(Limits, agent)) {
+        const error = new Error(`Unknown agent: ${agent}`)
+        error.status = 400
+        error.data = { success: false, message: `Unknown agent: ${agent}` }
+        throw error
+    }
+    const max = Limits[agent]
     const key = `rate:${userId}:${agent}`
     const count = await redis.incr(key) // increment the key so server can know how much it fetches per minute
     if(count==1) {
